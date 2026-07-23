@@ -7,9 +7,9 @@
   <style>
     :root {
       --primary-color: #6A1B9A;
-      --bg-color: #F7F9FC;
+      --bg-color: #FFF5F5; /* 已經改咗做淺粉紅色 */
       --card-bg: #FFFFFF;
-      --border-color: #E2E8F0;
+      --border-color: #F8BBD0;
     }
 
     * {
@@ -30,8 +30,9 @@
       max-width: 500px;
       background: var(--card-bg);
       border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      box-shadow: 0 10px 25px rgba(255, 182, 193, 0.2);
       padding: 20px;
+      border: 1px solid #FCE4EC;
     }
 
     .header {
@@ -42,7 +43,7 @@
     .header h1 {
       margin: 0 0 8px 0;
       font-size: 22px;
-      color: #2D3748;
+      color: #880E4F;
     }
 
     .controls {
@@ -50,7 +51,7 @@
       flex-direction: column;
       gap: 12px;
       margin-bottom: 16px;
-      background: #EDF2F7;
+      background: #FCE4EC;
       padding: 12px;
       border-radius: 12px;
     }
@@ -96,7 +97,7 @@
       align-items: center;
       gap: 12px;
       font-weight: bold;
-      color: #2D3748;
+      color: #880E4F;
     }
 
     .nav-btn {
@@ -122,7 +123,7 @@
 
     .instructions {
       font-size: 12px;
-      color: #718096;
+      color: #AD1457;
       text-align: center;
       margin-bottom: 16px;
     }
@@ -137,14 +138,14 @@
       text-align: center;
       font-size: 12px;
       font-weight: bold;
-      color: #A0AEC0;
+      color: #C2185B;
       padding-bottom: 6px;
     }
 
     .day-cell {
       min-height: 80px;
-      background: #FAFAFA;
-      border: 1px solid #EDF2F7;
+      background: #FFF9FB;
+      border: 1px solid #F8BBD0;
       border-radius: 8px;
       padding: 4px;
       cursor: pointer;
@@ -157,8 +158,8 @@
     }
 
     .day-cell.selected-cell {
-      border: 2px solid var(--primary-color) !important;
-      background-color: #F3E5F5;
+      border: 2px solid #D81B60 !important;
+      background-color: #FCE4EC;
     }
 
     .day-cell.empty {
@@ -170,7 +171,7 @@
     .day-number {
       font-size: 12px;
       font-weight: 600;
-      color: #4A5568;
+      color: #880E4F;
     }
 
     .busy-tag {
@@ -194,16 +195,15 @@
       display: inline-block;
       width: 6px;
       height: 6px;
-      background-color: #E53E3E;
+      background-color: #FF4081;
       border-radius: 50%;
       margin-left: 2px;
     }
 
-    /* Remarks 備註區樣式 */
     .remarks-section {
       margin-top: 20px;
-      background: #F7FAFC;
-      border: 1px solid var(--border-color);
+      background: #FFF0F3;
+      border: 1px solid #F8BBD0;
       border-radius: 12px;
       padding: 14px;
     }
@@ -211,7 +211,7 @@
     .remarks-header {
       font-size: 14px;
       font-weight: bold;
-      color: #2D3748;
+      color: #880E4F;
       margin-bottom: 8px;
       display: flex;
       justify-content: space-between;
@@ -226,14 +226,14 @@
     .remarks-input {
       flex: 1;
       padding: 8px 12px;
-      border: 1px solid #CBD5E0;
+      border: 1px solid #F48FB1;
       border-radius: 6px;
       font-size: 13px;
       outline: none;
     }
 
     .remarks-btn {
-      background: #6A1B9A;
+      background: #D81B60;
       color: white;
       border: none;
       padding: 8px 14px;
@@ -246,8 +246,8 @@
     .remarks-display {
       margin-top: 10px;
       font-size: 13px;
-      color: #4A5568;
-      background: #EDF2F7;
+      color: #C2185B;
+      background: #FCE4EC;
       padding: 8px 12px;
       border-radius: 6px;
       word-break: break-word;
@@ -264,12 +264,11 @@
   <div class="controls">
     <div class="control-row">
       <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="font-size: 14px; font-weight: 500;">我是：</span>
+        <span style="font-size: 14px; font-weight: 500; color: #880E4F;">我是：</span>
         <div class="user-select-container">
           <span class="color-circle" id="userColorDot"></span>
           <select id="userSelect" onchange="handleUserChange()">
-            <!-- 成員選單 -->
-          </select>
+            </select>
         </div>
       </div>
 
@@ -280,10 +279,22 @@
       </div>
     </div>
 
-    <!-- Jimmy 專屬活動選單 -->
+    <div class="activity-select-box" id="jaimieActivityBox" style="display: none;">
+      <span style="font-weight: 500; color: #880E4F;">Jaimie 活動選擇：</span>
+      <select id="jaimieReasonSelect" style="background: white; padding: 4px 8px; border-radius: 6px; border: 1px solid #F48FB1;">
+        <option value="返工">1. 返工</option>
+        <option value="返學">2. 返學</option>
+        <option value="睇牙">3. 睇牙</option>
+        <option value="約咗屋企人">4. 約咗屋企人</option>
+        <option value="約咗表姐">5. 約咗表姐</option>
+        <option value="約咗frd">6. 約咗frd</option>
+        <option value="其他">7. 其他</option>
+      </select>
+    </div>
+
     <div class="activity-select-box" id="jimmyActivityBox" style="display: none;">
-      <span style="font-weight: 500;">Jimmy 活動選擇：</span>
-      <select id="jimmyReasonSelect" style="background: white; padding: 4px 8px; border-radius: 6px; border: 1px solid #CBD5E0;">
+      <span style="font-weight: 500; color: #880E4F;">Jimmy 活動選擇：</span>
+      <select id="jimmyReasonSelect" style="background: white; padding: 4px 8px; border-radius: 6px; border: 1px solid #F48FB1;">
         <option value="打波">1. 打波</option>
         <option value="做gym">2. 做gym</option>
         <option value="返工">3. 返工</option>
@@ -292,6 +303,7 @@
         <option value="約咗其他frd">6. 約咗其他frd</option>
         <option value="約咗屋企人">7. 約咗屋企人</option>
         <option value="其他">8. 其他</option>
+        <option value="返學">9. 返學</option>
       </select>
     </div>
   </div>
@@ -302,7 +314,6 @@
 
   <div class="calendar-grid" id="calendarGrid"></div>
 
-  <!-- 下方 Remarks 備註欄 -->
   <div class="remarks-section" id="remarksSection">
     <div class="remarks-header">
       <span id="selectedDateTitle">請選擇日期查看或新增 Remarks</span>
@@ -316,16 +327,13 @@
 </div>
 
 <script>
-  // 兩位成員及其專屬顏色
   const members = [
-    { name: "jaimie", color: "#FFC107", textColor: "#2D2D2D" }, // 淺橙黃色
-    { name: "jimmy",  color: "#6A1B9A", textColor: "#FFFFFF" }  // 深紫色
+    { name: "jaimie", color: "#FFC107", textColor: "#2D2D2D" },
+    { name: "jimmy",  color: "#6A1B9A", textColor: "#FFFFFF" }
   ];
 
   let currentDate = new Date(2026, 7, 1);
   let selectedDateKey = null;
-
-  // LocalStorage 資料結構：{ busy: {}, remarks: {} }
   let storeData = JSON.parse(localStorage.getItem('our_shared_calender_data')) || { busy: {}, remarks: {} };
 
   function init() {
@@ -354,12 +362,15 @@
       dot.style.backgroundColor = memberInfo.color;
     }
 
-    // 只喺 Jimmy 嗰陣顯示活動下拉選單
+    const jaimieBox = document.getElementById('jaimieActivityBox');
     const jimmyBox = document.getElementById('jimmyActivityBox');
-    if (currentUser === 'jimmy') {
-      jimmyBox.style.display = 'flex';
-    } else {
+
+    if (currentUser === 'jaimie') {
+      jaimieBox.style.display = 'flex';
       jimmyBox.style.display = 'none';
+    } else if (currentUser === 'jimmy') {
+      jaimieBox.style.display = 'none';
+      jimmyBox.style.display = 'flex';
     }
   }
 
@@ -379,28 +390,21 @@
     const currentData = storeData.busy[dateStr][currentUser];
     let reason = '';
 
-    if (currentUser === 'jimmy') {
+    if (currentUser === 'jaimie') {
+      reason = document.getElementById('jaimieReasonSelect').value;
+    } else if (currentUser === 'jimmy') {
       reason = document.getElementById('jimmyReasonSelect').value;
     }
 
     if (!currentData) {
-      // 點擊第 1 下：唔得閒
       storeData.busy[dateStr][currentUser] = { status: 'busy', reason: reason };
     } else if (currentData.status === 'busy') {
-      // 點擊第 2 下：待定
       storeData.busy[dateStr][currentUser] = { status: 'maybe', reason: reason };
     } else {
-      // 點擊第 3 下：取消
       delete storeData.busy[dateStr][currentUser];
     }
 
     saveData();
-    renderCalendar();
-    updateRemarksUI();
-  }
-
-  function selectDateForRemark(dateStr) {
-    selectedDateKey = dateStr;
     renderCalendar();
     updateRemarksUI();
   }
@@ -434,7 +438,7 @@
       return;
     }
 
-    title.innerText = `📌 ${selectedDateKey} 備註 (Remarks):`;
+    title.innerText = `📌 ${selectedDateKey} 備註:`;
     inputGroup.style.display = 'flex';
     
     const existingRemark = storeData.remarks[selectedDateKey] || '';
@@ -455,9 +459,7 @@
   function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-
     document.getElementById('monthYearDisplay').innerText = `${year}/${month + 1}月`;
-
     const grid = document.getElementById('calendarGrid');
     grid.innerHTML = '';
 
@@ -481,7 +483,6 @@
     for (let day = 1; day <= totalDays; day++) {
       const cell = document.createElement('div');
       cell.className = 'day-cell';
-      
       const monthStr = String(month + 1).padStart(2, '0');
       const dayStr = String(day).padStart(2, '0');
       const dateKey = `${year}-${monthStr}-${dayStr}`;
@@ -492,46 +493,34 @@
 
       const dayNum = document.createElement('div');
       dayNum.className = 'day-number';
-      dayNum.innerHTML = `${day} ${storeData.remarks[dateKey] ? '<span class="has-remark-dot" title="有Remarks"></span>' : ''}`;
+      dayNum.innerHTML = `${day} ${storeData.remarks[dateKey] ? '<span class="has-remark-dot"></span>' : ''}`;
       cell.appendChild(dayNum);
 
-      // 渲染 busy tags
       if (storeData.busy[dateKey]) {
         Object.keys(storeData.busy[dateKey]).forEach(userName => {
           const userObj = storeData.busy[dateKey][userName];
           const memberInfo = members.find(m => m.name === userName);
-
           if (memberInfo) {
             const tag = document.createElement('div');
             tag.className = `busy-tag ${userObj.status === 'maybe' ? 'maybe' : ''}`;
             tag.style.backgroundColor = memberInfo.color;
             tag.style.color = memberInfo.textColor;
-
             let labelText = userName;
-            if (userName === 'jimmy' && userObj.reason) {
-              labelText += ` (${userObj.reason})`;
-            }
-            if (userObj.status === 'maybe') {
-              labelText += '?';
-            }
-
+            if (userObj.reason) labelText += ` (${userObj.reason})`;
+            if (userObj.status === 'maybe') labelText += '?';
             tag.innerText = labelText;
             cell.appendChild(tag);
           }
         });
       }
-
-      // 點擊事件：切換標記並選取該日期顯示 Remarks
-      cell.onclick = (e) => {
-        toggleStatus(dateKey);
-      };
-
+      cell.onclick = () => toggleStatus(dateKey);
       grid.appendChild(cell);
     }
   }
-
   init();
 </script>
-
 </body>
 </html>
+
+</details>
+
