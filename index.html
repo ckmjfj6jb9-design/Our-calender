@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📅 共同要睇嘅calender!</title>
+  <style>
+    :root {
+      --primary-color: #6A1B9A;
+      --bg-color: #F7F9FC;
+      --card-bg: #FFFFFF;
+      --border-color: #E2E8F0;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0 0 8px 0;
+      font-size: 22px;
+      color: #2D3748;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: #EDF2F7;
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .user-select-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .color-circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 2px rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+
+    select {
+      border: none;
+      font-size: 14px;
+      font-weight: bold;
+      outline: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: bold;
+      color: #2D3748;
+    }
+
+    .nav-btn {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .activity-select-box {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .instructions {
+      font-size: 12px;
+      color: #718096;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
+    .weekday-header {
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #A0AEC0;
+      padding-bottom: 6px;
+    }
+
+    .day-cell {
+      min-height: 80px;
+      background: #FAFAFA;
+      border: 1px solid #EDF2F7;
+      border-radius: 8px;
+      padding: 4px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 0.1s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .day-cell.selected-cell {
+      border: 2px solid var(--primary-color) !important;
+      background-color: #F3E5F5;
+    }
+
+    .day-cell.empty {
+      background: transparent;
+      border: none;
+      cursor: default;
+    }
+
+    .day-number {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4A5568;
+    }
+
+    .busy-tag {
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 4px;
+      border-radius: 4px;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .busy-tag.maybe {
+      opacity: 0.6;
+    }
+
+    .has-remark-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background-color: #E53E3E;
+      border-radius: 50%;
+      margin-left: 2px;
+    }
+
+    /* Remarks 備註區樣式 */
+    .remarks-section {
+      margin-top: 20px;
+      background: #F7FAFC;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .remarks-header {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2D3748;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .remarks-input-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .remarks-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #CBD5E0;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .remarks-btn {
+      background: #6A1B9A;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .remarks-display {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #4A5568;
+      background: #EDF2F7;
+      padding: 8px 12px;
+      border-radius: 6px;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="header">
+    <h1>📅 共同要睇嘅calender!</h1>
+  </div>
+
+  <div class="controls">
+    <div class="control-row">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 14px; font-weight: 500;">我是：</span>
+        <div class="user-select-container">
+          <span class="color-circle" id="userColorDot"></span>
+          <select id="userSelect" onchange="handleUserChange()">
+            <!-- 成員選單 -->
+          </select>
+        </div>
+      </div>
+
+      <div class="month-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)">&lt;</button>
+        <span id="monthYearDisplay">2026/8月</span>
+        <button class="nav-btn" onclick="changeMonth(1)">&gt;</button>
+      </div>
+    </div>
+
+    <!-- Jimmy 專屬活動選單 -->
+    <div class="activity-select-box" id="jimmyActivityBox" style="display: none;">
+      <span style="font-weight: 500;">Jimmy 活動選擇：</span>
+      <select id="jimmyReasonSelect" style="background: white; padding: 4px 8px; border-radius: 6px; border: 1px solid #CBD5E0;">
+        <option value="打波">1. 打波</option>
+        <option value="做gym">2. 做gym</option>
+        <option value="返工">3. 返工</option>
+        <option value="做物理治療">4. 做物理治療</option>
+        <option value="Training">5. Training</option>
+        <option value="約咗其他frd">6. 約咗其他frd</option>
+        <option value="約咗屋企人">7. 約咗屋企人</option>
+        <option value="其他">8. 其他</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="instructions">
+    💡 點擊日期：<b>標示唔得閒</b> ➔ <b>待定</b> ➔ <b>取消</b>
+  </div>
+
+  <div class="calendar-grid" id="calendarGrid"></div>
+
+  <!-- 下方 Remarks 備註欄 -->
+  <div class="remarks-section" id="remarksSection">
+    <div class="remarks-header">
+      <span id="selectedDateTitle">請選擇日期查看或新增 Remarks</span>
+    </div>
+    <div class="remarks-input-group" id="remarksInputGroup" style="display: none;">
+      <input type="text" id="remarkInput" class="remarks-input" placeholder="例如：淨係下午得閒 / 一點得閒...">
+      <button class="remarks-btn" onclick="saveRemark()">儲存</button>
+    </div>
+    <div class="remarks-display" id="remarksDisplay" style="display: none;"></div>
+  </div>
+</div>
+
+<script>
+  // 兩位成員及其專屬顏色
+  const members = [
+    { name: "jaimie", color: "#FFC107", textColor: "#2D2D2D" }, // 淺橙黃色
+    { name: "jimmy",  color: "#6A1B9A", textColor: "#FFFFFF" }  // 深紫色
+  ];
+
+  let currentDate = new Date(2026, 7, 1);
+  let selectedDateKey = null;
+
+  // LocalStorage 資料結構：{ busy: {}, remarks: {} }
+  let storeData = JSON.parse(localStorage.getItem('our_shared_calender_data')) || { busy: {}, remarks: {} };
+
+  function init() {
+    renderUserSelect();
+    handleUserChange();
+    renderCalendar();
+  }
+
+  function renderUserSelect() {
+    const select = document.getElementById('userSelect');
+    select.innerHTML = '';
+    members.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.innerText = m.name;
+      select.appendChild(opt);
+    });
+  }
+
+  function handleUserChange() {
+    const currentUser = document.getElementById('userSelect').value;
+    const memberInfo = members.find(m => m.name === currentUser);
+    const dot = document.getElementById('userColorDot');
+    
+    if (memberInfo) {
+      dot.style.backgroundColor = memberInfo.color;
+    }
+
+    // 只喺 Jimmy 嗰陣顯示活動下拉選單
+    const jimmyBox = document.getElementById('jimmyActivityBox');
+    if (currentUser === 'jimmy') {
+      jimmyBox.style.display = 'flex';
+    } else {
+      jimmyBox.style.display = 'none';
+    }
+  }
+
+  function changeMonth(delta) {
+    currentDate.setMonth(currentDate.getMonth() + delta);
+    renderCalendar();
+  }
+
+  function toggleStatus(dateStr) {
+    selectedDateKey = dateStr;
+    const currentUser = document.getElementById('userSelect').value;
+    
+    if (!storeData.busy[dateStr]) {
+      storeData.busy[dateStr] = {};
+    }
+
+    const currentData = storeData.busy[dateStr][currentUser];
+    let reason = '';
+
+    if (currentUser === 'jimmy') {
+      reason = document.getElementById('jimmyReasonSelect').value;
+    }
+
+    if (!currentData) {
+      // 點擊第 1 下：唔得閒
+      storeData.busy[dateStr][currentUser] = { status: 'busy', reason: reason };
+    } else if (currentData.status === 'busy') {
+      // 點擊第 2 下：待定
+      storeData.busy[dateStr][currentUser] = { status: 'maybe', reason: reason };
+    } else {
+      // 點擊第 3 下：取消
+      delete storeData.busy[dateStr][currentUser];
+    }
+
+    saveData();
+    renderCalendar();
+    updateRemarksUI();
+  }
+
+  function selectDateForRemark(dateStr) {
+    selectedDateKey = dateStr;
+    renderCalendar();
+    updateRemarksUI();
+  }
+
+  function saveRemark() {
+    if (!selectedDateKey) return;
+    const input = document.getElementById('remarkInput');
+    const text = input.value.trim();
+    
+    if (text) {
+      storeData.remarks[selectedDateKey] = text;
+    } else {
+      delete storeData.remarks[selectedDateKey];
+    }
+
+    saveData();
+    renderCalendar();
+    updateRemarksUI();
+  }
+
+  function updateRemarksUI() {
+    const title = document.getElementById('selectedDateTitle');
+    const inputGroup = document.getElementById('remarksInputGroup');
+    const display = document.getElementById('remarksDisplay');
+    const input = document.getElementById('remarkInput');
+
+    if (!selectedDateKey) {
+      title.innerText = "請點擊日期查看或新增 Remarks";
+      inputGroup.style.display = 'none';
+      display.style.display = 'none';
+      return;
+    }
+
+    title.innerText = `📌 ${selectedDateKey} 備註 (Remarks):`;
+    inputGroup.style.display = 'flex';
+    
+    const existingRemark = storeData.remarks[selectedDateKey] || '';
+    input.value = existingRemark;
+
+    if (existingRemark) {
+      display.style.display = 'block';
+      display.innerText = `💬 備註：${existingRemark}`;
+    } else {
+      display.style.display = 'none';
+    }
+  }
+
+  function saveData() {
+    localStorage.setItem('our_shared_calender_data', JSON.stringify(storeData));
+  }
+
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    document.getElementById('monthYearDisplay').innerText = `${year}/${month + 1}月`;
+
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    weekdays.forEach(day => {
+      const header = document.createElement('div');
+      header.className = 'weekday-header';
+      header.innerText = day;
+      grid.appendChild(header);
+    });
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDayIndex; i++) {
+      const emptyCell = document.createElement('div');
+      emptyCell.className = 'day-cell empty';
+      grid.appendChild(emptyCell);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+      
+      const monthStr = String(month + 1).padStart(2, '0');
+      const dayStr = String(day).padStart(2, '0');
+      const dateKey = `${year}-${monthStr}-${dayStr}`;
+
+      if (dateKey === selectedDateKey) {
+        cell.classList.add('selected-cell');
+      }
+
+      const dayNum = document.createElement('div');
+      dayNum.className = 'day-number';
+      dayNum.innerHTML = `${day} ${storeData.remarks[dateKey] ? '<span class="has-remark-dot" title="有Remarks"></span>' : ''}`;
+      cell.appendChild(dayNum);
+
+      // 渲染 busy tags
+      if (storeData.busy[dateKey]) {
+        Object.keys(storeData.busy[dateKey]).forEach(userName => {
+          const userObj = storeData.busy[dateKey][userName];
+          const memberInfo = members.find(m => m.name === userName);
+
+          if (memberInfo) {
+            const tag = document.createElement('div');
+            tag.className = `busy-tag ${userObj.status === 'maybe' ? 'maybe' : ''}`;
+            tag.style.backgroundColor = memberInfo.color;
+            tag.style.color = memberInfo.textColor;
+
+            let labelText = userName;
+            if (userName === 'jimmy' && userObj.reason) {
+              labelText += ` (${userObj.reason})`;
+            }
+            if (userObj.status === 'maybe') {
+              labelText += '?';
+            }
+
+            tag.innerText = labelText;
+            cell.appendChild(tag);
+          }
+        });
+      }
+
+      // 點擊事件：切換標記並選取該日期顯示 Remarks
+      cell.onclick = (e) => {
+        toggleStatus(dateKey);
+      };
+
+      grid.appendChild(cell);
+    }
+  }
+
+  init();
+</script>
+
+</body>
+</html>
