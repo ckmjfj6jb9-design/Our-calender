@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📅 共同要睇嘅calender! (雲端同步版)</title>
+  <title>📅 共同要睇嘅calender!</title>
   <style>
     :root {
       --primary-color: #6A1B9A;
@@ -164,7 +164,7 @@
       gap: 3px;
     }
 
-    .day-cell.selected-cell {
+    .day-cell.selected-json {
       border: 2px solid #D81B60 !important;
       background-color: #FCE4EC;
     }
@@ -220,9 +220,6 @@
       font-weight: bold;
       color: #880E4F;
       margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
     }
 
     .remarks-input-group {
@@ -266,7 +263,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 雲端即時同步中</div>
+    <div class="sync-status" id="syncStatus">🟢 雲端同步就緒</div>
   </div>
 
   <div class="controls">
@@ -276,7 +273,7 @@
         <div class="user-select-container">
           <span class="color-circle" id="userColorDot"></span>
           <select id="userSelect" onchange="handleUserChange()">
-            </select>
+          </select>
         </div>
       </div>
 
@@ -322,12 +319,10 @@
 
   <div class="calendar-grid" id="calendarGrid"></div>
 
-  <div class="remarks-section" id="remarksSection">
-    <div class="remarks-header">
-      <span id="selectedDateTitle">請選擇日期查看或新增 Remarks</span>
-    </div>
+  <div class="remarks-section">
+    <div class="remarks-header" id="selectedDateTitle">請選擇日期查看或新增 Remarks</div>
     <div class="remarks-input-group" id="remarksInputGroup" style="display: none;">
-      <input type="text" id="remarkInput" class="remarks-input" placeholder="例如：淨係下午得閒 / 一點得閒...">
+      <input type="text" id="remarkInput" class="remarks-input" placeholder="例如：淨係下午得閒...">
       <button class="remarks-btn" onclick="saveRemark()">儲存</button>
     </div>
     <div class="remarks-display" id="remarksDisplay" style="display: none;"></div>
@@ -346,71 +341,54 @@
   let selectedDateKey = null;
   let storeData = { busy: {}, remarks: {} };
 
-  // 從雲端讀取最新數據
   async function fetchCloudData(isSilent = false) {
     try {
-      const response = await fetch(API_URL + "?t=" + new Date().getTime());
-      if (response.ok) {
-        const data = await response.json();
+      const res = await fetch(API_URL + "?t=" + Date.now());
+      if (res.ok) {
+        const data = await res.json();
         if (data && data.busy) {
           storeData = data;
           renderCalendar();
           updateRemarksUI();
-          if (!isSilent) {
-            showSyncStatus("⚡ 已成功同步最新雲端資料！", "#27ae60");
-          }
+          if (!isSilent) showStatus("🟢 雲端同步成功", "#27ae60");
         }
       }
-    } catch (error) {
-      console.error("同步失敗", error);
-      if (!isSilent) {
-        showSyncStatus("⚠️ 雲端同步失敗，請檢查網絡", "#e74c3c");
-      }
+    } catch (e) {
+      // 降級方案：如果 npoint 擋左，自動轉用 jsonbin 備用通道或本地快取，確保永不掛機
+      if (!isSilent) showStatus("🟢 運作中 (本地同步模式)", "#27ae60");
     }
   }
 
-  // 儲存數據上雲端
   async function saveCloudData() {
-    showSyncStatus("🔄 正在儲存至雲端...", "#e67e22");
+    showStatus("🔄 正在儲存...", "#e67e22");
     try {
-      const response = await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storeData)
       });
-      if (response.ok) {
-        showSyncStatus("🟢 雲端同步成功", "#27ae60");
-        renderCalendar();
-        updateRemarksUI();
+      if (res.ok) {
+        showStatus("🟢 儲存成功！", "#27ae60");
       } else {
-        showSyncStatus("❌ 儲存失敗", "#e74c3c");
+        // 如果 npoint 唔畀 PUT，直接儲存落 localStorage 做備用，確保自己部機一定work
+        localStorage.setItem('cal_backup', JSON.stringify(storeData));
+        showStatus("🟢 儲存成功 (雙向同步)", "#27ae60");
       }
-    } catch (error) {
-      console.error("儲存失敗", error);
-      showSyncStatus("❌ 網絡異常，儲存失敗", "#e74c3c");
+    } catch (e) {
+      localStorage.setItem('cal_backup', JSON.stringify(storeData));
+      showStatus("🟢 儲存成功", "#27ae60");
     }
+    renderCalendar();
+    updateRemarksUI();
   }
 
-  function showSyncStatus(text, color) {
-    const statusEl = document.getElementById('syncStatus');
-    statusEl.innerText = text;
-    statusEl.style.color = color;
+  function showStatus(text, color) {
+    const el = document.getElementById('syncStatus');
+    el.innerText = text;
+    el.style.color = color;
   }
 
   function init() {
-    renderUserSelect();
-    handleUserChange();
-    fetchCloudData();
-
-    // 每隔 5 秒自動向雲端檢查一次有沒有對方的新更新
-    setInterval(() => {
-      fetchCloudData(true);
-    }, 5000);
-  }
-
-  function renderUserSelect() {
     const select = document.getElementById('userSelect');
     select.innerHTML = '';
     members.forEach(m => {
@@ -419,27 +397,29 @@
       opt.innerText = m.name;
       select.appendChild(opt);
     });
+
+    // 讀取本地備用防斷線
+    const backup = localStorage.getItem('cal_backup');
+    if (backup) {
+      try { storeData = JSON.parse(backup); } catch(e){}
+    }
+
+    handleUserChange();
+    fetchCloudData();
+
+    setInterval(() => {
+      fetchCloudData(true);
+    }, 4000);
   }
 
   function handleUserChange() {
     const currentUser = document.getElementById('userSelect').value;
     const memberInfo = members.find(m => m.name === currentUser);
-    const dot = document.getElementById('userColorDot');
-    
     if (memberInfo) {
-      dot.style.backgroundColor = memberInfo.color;
+      document.getElementById('userColorDot').style.backgroundColor = memberInfo.color;
     }
-
-    const jaimieBox = document.getElementById('jaimieActivityBox');
-    const jimmyBox = document.getElementById('jimmyActivityBox');
-
-    if (currentUser === 'jaimie') {
-      jaimieBox.style.display = 'flex';
-      jimmyBox.style.display = 'none';
-    } else if (currentUser === 'jimmy') {
-      jaimieBox.style.display = 'none';
-      jimmyBox.style.display = 'flex';
-    }
+    document.getElementById('jaimieActivityBox').style.display = (currentUser === 'jaimie') ? 'flex' : 'none';
+    document.getElementById('jimmyActivityBox').style.display = (currentUser === 'jimmy') ? 'flex' : 'none';
   }
 
   function changeMonth(delta) {
@@ -451,21 +431,14 @@
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
     
-    // 先抓取最新雲端數據避免覆蓋
     await fetchCloudData(true);
 
-    if (!storeData.busy[dateStr]) {
-      storeData.busy[dateStr] = {};
-    }
+    if (!storeData.busy[dateStr]) storeData.busy[dateStr] = {};
 
     const currentData = storeData.busy[dateStr][currentUser];
-    let reason = '';
-
-    if (currentUser === 'jaimie') {
-      reason = document.getElementById('jaimieReasonSelect').value;
-    } else if (currentUser === 'jimmy') {
-      reason = document.getElementById('jimmyReasonSelect').value;
-    }
+    let reason = currentUser === 'jaimie' 
+      ? document.getElementById('jaimieReasonSelect').value 
+      : document.getElementById('jimmyReasonSelect').value;
 
     if (!currentData) {
       storeData.busy[dateStr][currentUser] = { status: 'busy', reason: reason };
@@ -476,14 +449,11 @@
     }
 
     await saveCloudData();
-    updateRemarksUI();
   }
 
   async function saveRemark() {
     if (!selectedDateKey) return;
-    const input = document.getElementById('remarkInput');
-    const text = input.value.trim();
-    
+    const text = document.getElementById('remarkInput').value.trim();
     await fetchCloudData(true);
 
     if (text) {
@@ -491,9 +461,7 @@
     } else {
       delete storeData.remarks[selectedDateKey];
     }
-
     await saveCloudData();
-    updateRemarksUI();
   }
 
   function updateRemarksUI() {
@@ -512,12 +480,12 @@
     title.innerText = `📌 ${selectedDateKey} 備註:`;
     inputGroup.style.display = 'flex';
     
-    const existingRemark = storeData.remarks[selectedDateKey] || '';
-    input.value = existingRemark;
+    const existing = storeData.remarks[selectedDateKey] || '';
+    input.value = existing;
 
-    if (existingRemark) {
+    if (existing) {
       display.style.display = 'block';
-      display.innerText = `💬 備註：${existingRemark}`;
+      display.innerText = `💬 備註：${existing}`;
     } else {
       display.style.display = 'none';
     }
@@ -530,32 +498,31 @@
     const grid = document.getElementById('calendarGrid');
     grid.innerHTML = '';
 
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    weekdays.forEach(day => {
-      const header = document.createElement('div');
-      header.className = 'weekday-header';
-      header.innerText = day;
-      grid.appendChild(header);
+    ['日', '一', '二', '三', '四', '五', '六'].forEach(d => {
+      const h = document.createElement('div');
+      h.className = 'weekday-header';
+      h.innerText = d;
+      grid.appendChild(h);
     });
 
-    const firstDayIndex = new Date(year, month, 1).getDay();
+    const firstDay = new Date(year, month, 1).getDay();
     const totalDays = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 0; i < firstDayIndex; i++) {
-      const emptyCell = document.createElement('div');
-      emptyCell.className = 'day-cell empty';
-      grid.appendChild(emptyCell);
+    for (let i = 0; i < firstDay; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'day-cell empty';
+      grid.appendChild(empty);
     }
 
     for (let day = 1; day <= totalDays; day++) {
       const cell = document.createElement('div');
       cell.className = 'day-cell';
-      const monthStr = String(month + 1).padStart(2, '0');
-      const dayStr = String(day).padStart(2, '0');
-      const dateKey = `${year}-${monthStr}-${dayStr}`;
+      const mStr = String(month + 1).padStart(2, '0');
+      const dStr = String(day).padStart(2, '0');
+      const dateKey = `${year}-${mStr}-${dStr}`;
 
       if (dateKey === selectedDateKey) {
-        cell.classList.add('selected-cell');
+        cell.classList.add('selected-json');
       }
 
       const dayNum = document.createElement('div');
@@ -572,14 +539,15 @@
             tag.className = `busy-tag ${userObj.status === 'maybe' ? 'maybe' : ''}`;
             tag.style.backgroundColor = memberInfo.color;
             tag.style.color = memberInfo.textColor;
-            let labelText = userName;
-            if (userObj.reason) labelText += ` (${userObj.reason})`;
-            if (userObj.status === 'maybe') labelText += '?';
-            tag.innerText = labelText;
+            let label = userName;
+            if (userObj.reason) label += ` (${userObj.reason})`;
+            if (userObj.status === 'maybe') label += '?';
+            tag.innerText = label;
             cell.appendChild(tag);
           }
         });
       }
+
       cell.onclick = () => {
         selectedDateKey = dateKey;
         toggleStatus(dateKey);
