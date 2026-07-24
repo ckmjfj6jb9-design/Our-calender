@@ -341,51 +341,51 @@
   let selectedDateKey = null;
   let storeData = { busy: {}, remarks: {} };
 
-  async function fetchCloudData(isSilent = false) {
+  // 優先讀取手機本地儲存（確保自己撳完嘅嘢即刻鎖死喺度唔會消失）
+  function loadLocal() {
+    const local = localStorage.getItem('cal_data_safe');
+    if (local) {
+      try { storeData = JSON.parse(local); } catch(e) {}
+    }
+  }
+
+  function saveLocal() {
+    localStorage.setItem('cal_data_safe', JSON.stringify(storeData));
+  }
+
+  async function fetchCloudData() {
     try {
       const res = await fetch(API_URL + "?t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
-        if (data && data.busy) {
+        // 只有當雲端有真實資料時先覆蓋，費事被空白雲端洗走
+        if (data && data.busy && Object.keys(data.busy).length > 0) {
           storeData = data;
-          renderCalendar();
-          updateRemarksUI();
-          if (!isSilent) showStatus("🟢 雲端同步成功", "#27ae60");
+          saveLocal();
         }
       }
     } catch (e) {
-      // 降級方案：如果 npoint 擋左，自動轉用 jsonbin 備用通道或本地快取，確保永不掛機
-      if (!isSilent) showStatus("🟢 運作中 (本地同步模式)", "#27ae60");
-    }
-  }
-
-  async function saveCloudData() {
-    showStatus("🔄 正在儲存...", "#e67e22");
-    try {
-      const res = await fetch(API_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(storeData)
-      });
-      if (res.ok) {
-        showStatus("🟢 儲存成功！", "#27ae60");
-      } else {
-        // 如果 npoint 唔畀 PUT，直接儲存落 localStorage 做備用，確保自己部機一定work
-        localStorage.setItem('cal_backup', JSON.stringify(storeData));
-        showStatus("🟢 儲存成功 (雙向同步)", "#27ae60");
-      }
-    } catch (e) {
-      localStorage.setItem('cal_backup', JSON.stringify(storeData));
-      showStatus("🟢 儲存成功", "#27ae60");
+      console.log("使用本地數據");
     }
     renderCalendar();
     updateRemarksUI();
   }
 
-  function showStatus(text, color) {
-    const el = document.getElementById('syncStatus');
-    el.innerText = text;
-    el.style.color = color;
+  async function saveCloudData() {
+    saveLocal(); // 確保本地一定有
+    renderCalendar();
+    updateRemarksUI();
+
+    try {
+      await fetch(API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeData)
+      });
+      document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
+    } catch (e) {
+      document.getElementById('syncStatus').innerText = "🟢 已儲存至本地";
+    }
   }
 
   function init() {
@@ -398,18 +398,16 @@
       select.appendChild(opt);
     });
 
-    // 讀取本地備用防斷線
-    const backup = localStorage.getItem('cal_backup');
-    if (backup) {
-      try { storeData = JSON.parse(backup); } catch(e){}
-    }
-
-    handleUserChange();
+    loadLocal();
+    renderCalendar();
     fetchCloudData();
 
+    // 定時背景同步，但唔會清空畫面
     setInterval(() => {
-      fetchCloudData(true);
-    }, 4000);
+      fetchCloudData();
+    }, 5000);
+
+    handleUserChange();
   }
 
   function handleUserChange() {
@@ -427,11 +425,9 @@
     renderCalendar();
   }
 
-  async function toggleStatus(dateStr) {
+  function toggleStatus(dateStr) {
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
-    
-    await fetchCloudData(true);
 
     if (!storeData.busy[dateStr]) storeData.busy[dateStr] = {};
 
@@ -446,22 +442,24 @@
       storeData.busy[dateStr][currentUser] = { status: 'maybe', reason: reason };
     } else {
       delete storeData.busy[dateStr][currentUser];
+      if (Object.keys(storeData.busy[dateStr]).length === 0) {
+        delete storeData.busy[dateStr];
+      }
     }
 
-    await saveCloudData();
+    saveCloudData();
   }
 
-  async function saveRemark() {
+  function saveRemark() {
     if (!selectedDateKey) return;
     const text = document.getElementById('remarkInput').value.trim();
-    await fetchCloudData(true);
 
     if (text) {
       storeData.remarks[selectedDateKey] = text;
     } else {
       delete storeData.remarks[selectedDateKey];
     }
-    await saveCloudData();
+    saveCloudData();
   }
 
   function updateRemarksUI() {
