@@ -263,7 +263,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 雲端同步就緒</div>
+    <div class="sync-status" id="syncStatus">🟢 雲端同步中...</div>
   </div>
 
   <div class="controls">
@@ -341,50 +341,46 @@
   let selectedDateKey = null;
   let storeData = { busy: {}, remarks: {} };
 
-  // 優先讀取手機本地儲存（確保自己撳完嘅嘢即刻鎖死喺度唔會消失）
-  function loadLocal() {
-    const local = localStorage.getItem('cal_data_safe');
-    if (local) {
-      try { storeData = JSON.parse(local); } catch(e) {}
-    }
-  }
-
-  function saveLocal() {
-    localStorage.setItem('cal_data_safe', JSON.stringify(storeData));
-  }
-
+  // 直接從雲端拉取最新資料
   async function fetchCloudData() {
     try {
       const res = await fetch(API_URL + "?t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
-        // 只有當雲端有真實資料時先覆蓋，費事被空白雲端洗走
-        if (data && data.busy && Object.keys(data.busy).length > 0) {
-          storeData = data;
-          saveLocal();
+        if (data && typeof data === 'object') {
+          storeData = {
+            busy: data.busy || {},
+            remarks: data.remarks || {}
+          };
+          renderCalendar();
+          updateRemarksUI();
+          document.getElementById('syncStatus').innerText = "🟢 雲端同步成功";
         }
       }
     } catch (e) {
-      console.log("使用本地數據");
+      document.getElementById('syncStatus').innerText = "🔴 雲端連線失敗，請檢查網絡";
     }
-    renderCalendar();
-    updateRemarksUI();
   }
 
+  // 直接儲存上雲端，兩部機共用同一份
   async function saveCloudData() {
-    saveLocal(); // 確保本地一定有
+    document.getElementById('syncStatus').innerText = "🔄 正在同步至雲端...";
     renderCalendar();
     updateRemarksUI();
 
     try {
-      await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storeData)
       });
-      document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
+      if (res.ok) {
+        document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
+      } else {
+        document.getElementById('syncStatus').innerText = "🔴 同步失敗 (請重試)";
+      }
     } catch (e) {
-      document.getElementById('syncStatus').innerText = "🟢 已儲存至本地";
+      document.getElementById('syncStatus').innerText = "🔴 網絡異常";
     }
   }
 
@@ -398,14 +394,12 @@
       select.appendChild(opt);
     });
 
-    loadLocal();
-    renderCalendar();
     fetchCloudData();
 
-    // 定時背景同步，但唔會清空畫面
+    // 每 3 秒自動向雲端更新，確保另一部機改咗嘢，呢邊即刻睇到
     setInterval(() => {
       fetchCloudData();
-    }, 5000);
+    }, 3000);
 
     handleUserChange();
   }
@@ -425,10 +419,14 @@
     renderCalendar();
   }
 
-  function toggleStatus(dateStr) {
+  async function toggleStatus(dateStr) {
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
 
+    // 每次撳之前先拉一次最新雲端資料，費事覆蓋咗對方剛才加嘅嘢
+    await fetchCloudData();
+
+    if (!storeData.busy) storeData.busy = {};
     if (!storeData.busy[dateStr]) storeData.busy[dateStr] = {};
 
     const currentData = storeData.busy[dateStr][currentUser];
@@ -447,19 +445,22 @@
       }
     }
 
-    saveCloudData();
+    await saveCloudData();
   }
 
-  function saveRemark() {
+  async function saveRemark() {
     if (!selectedDateKey) return;
     const text = document.getElementById('remarkInput').value.trim();
 
+    await fetchCloudData();
+
+    if (!storeData.remarks) storeData.remarks = {};
     if (text) {
       storeData.remarks[selectedDateKey] = text;
     } else {
       delete storeData.remarks[selectedDateKey];
     }
-    saveCloudData();
+    await saveCloudData();
   }
 
   function updateRemarksUI() {
@@ -478,7 +479,7 @@
     title.innerText = `📌 ${selectedDateKey} 備註:`;
     inputGroup.style.display = 'flex';
     
-    const existing = storeData.remarks[selectedDateKey] || '';
+    const existing = (storeData.remarks && storeData.remarks[selectedDateKey]) || '';
     input.value = existing;
 
     if (existing) {
