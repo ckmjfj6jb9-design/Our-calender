@@ -263,7 +263,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 準備就緒</div>
+    <div class="sync-status" id="syncStatus">🟢 強制同步就緒</div>
   </div>
 
   <div class="controls">
@@ -341,77 +341,108 @@
   let selectedDateKey = null;
   let storeData = { busy: {}, remarks: {} };
 
-  // 1. 先從本地讀取（防彈機制，確保瞬間有資料顯示）
-  function loadFromLocal() {
-    const saved = localStorage.getItem('cal_safe_backup');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.busy) storeData = parsed;
-      } catch (e) {}
+  function loadLocal() {
+    const local = localStorage.getItem('cal_anticache_data');
+    if (local) {
+      try { storeData = JSON.parse(local); } catch(e) {}
     }
   }
 
-  // 2. 儲存落本地
-  function saveToLocal() {
-    localStorage.setItem('cal_safe_backup', JSON.stringify(storeData));
+  function saveLocal() {
+    localStorage.getItem('cal_anticache_data');
+    localStorage.setItem('cal_anticache_data', JSON.stringify(storeData));
   }
 
-  // 從雲端讀取，並同本地資料融合（如果雲端空白，就用本地頂上，唔會被洗走）
-  async function fetchCloudData(isBackground = false) {
-    try {
-      const res = await fetch(API_URL + "?t=" + Date.now());
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.busy && Object.keys(data.busy).length > 0) {
-          // 雲端有野就以雲端為主，並更新本地
-          storeData = data;
-          saveToLocal();
-        } else {
-          // 如果雲端係空，但本地有野，就將本地推上雲端修復返
-          if (storeData && Object.keys(storeData.busy).length > 0) {
-            await pushToCloudSilent();
+  // 深度合拼：將雲端同本地所有資料完美二合一
+  function mergeData(cloudData) {
+    if (!cloudData) return;
+    
+    let hasChanges = false;
+
+    // 合拼 busy
+    if (cloudData.busy) {
+      if (!storeData.busy) storeData.busy = {};
+      for (let date in cloudData.busy) {
+        if (!storeData.busy[date]) storeData.busy[date] = {};
+        for (let user in cloudData.busy[date]) {
+          const cloudVal = JSON.stringify(cloudData.busy[date][user]);
+          const localVal = JSON.stringify(storeData.busy[date][user]);
+          if (cloudVal !== localVal) {
+            storeData.busy[date][user] = cloudData.busy[date][user];
+            hasChanges = true;
           }
         }
-        renderCalendar();
-        updateRemarksUI();
-        if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 同步成功";
       }
-    } catch (e) {
-      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 本地離線保護模式";
+    }
+
+    // 合拼 remarks
+    if (cloudData.remarks) {
+      if (!storeData.remarks) storeData.remarks = {};
+      for (let date in cloudData.remarks) {
+        if (cloudData.remarks[date] && cloudData.remarks[date] !== storeData.remarks[date]) {
+          storeData.remarks[date] = cloudData.remarks[date];
+          hasChanges = true;
+        }
+      }
+    }
+
+    saveLocal();
+    if (hasChanges) {
+      renderCalendar();
+      updateRemarksUI();
     }
   }
 
-  async function pushToCloudSilent() {
+  // 強制聯絡雲端（加上 ?nocache=亂碼 防止快取）
+  async function fetchCloudData(isBackground = false) {
     try {
-      await fetch(API_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(storeData)
-      });
-    } catch(e) {}
+      const antiCacheUrl = `${API_URL}?nocache=${Date.now()}_${Math.random()}`;
+      const res = await fetch(antiCacheUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const cloudData = await res.json();
+        if (cloudData && (cloudData.busy || cloudData.remarks)) {
+          mergeData(cloudData);
+        }
+      }
+      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 即時同步正常";
+    } catch (e) {
+      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 離線保護模式";
+    }
   }
 
-  // 儲存資料（先寫入本地，再同步上雲端）
-  async function saveAllData() {
-    saveToLocal(); // 確保本地第一時間鎖死，絕對唔會不見
+  // 儲存並強制上載到雲端
+  async function syncAndSave() {
+    saveLocal();
     renderCalendar();
     updateRemarksUI();
 
-    document.getElementById('syncStatus').innerText = "🔄 儲存中...";
+    document.getElementById('syncStatus').innerText = "🔄 正在同步更新...";
     try {
-      const res = await fetch(API_URL, {
+      // 1. 寫入前先強制拉一次最新雲端資料合拼，確保唔會蓋過對方
+      const antiCacheUrl = `${API_URL}?nocache=${Date.now()}_${Math.random()}`;
+      const getRes = await fetch(antiCacheUrl, { cache: 'no-store' });
+      if (getRes.ok) {
+        const cloudData = await getRes.json();
+        mergeData(cloudData);
+      }
+
+      // 2. 將合拼後的最新完整資料 PUT 上雲端
+      const putRes = await fetch(API_URL, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
         body: JSON.stringify(storeData)
       });
-      if (res.ok) {
+
+      if (putRes.ok) {
         document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
       } else {
-        document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地安全模式)";
+        document.getElementById('syncStatus').innerText = "🟢 已儲存 (雲端忙碌中)";
       }
     } catch (e) {
-      document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地安全模式)";
+      document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地模式)";
     }
   }
 
@@ -425,14 +456,14 @@
       select.appendChild(opt);
     });
 
-    loadFromLocal(); // 先載入本地
+    loadLocal();
     renderCalendar();
-    fetchCloudData(); // 再嘗試聯絡雲端
+    fetchCloudData();
 
-    // 每 4 秒背景同步一次
+    // 每 3 秒自動在背景強制無快取抓取一次資料
     setInterval(() => {
       fetchCloudData(true);
-    }, 4000);
+    }, 3000);
 
     handleUserChange();
   }
@@ -475,7 +506,7 @@
       }
     }
 
-    await saveAllData();
+    await syncAndSave();
   }
 
   async function saveRemark() {
@@ -488,7 +519,7 @@
     } else {
       delete storeData.remarks[selectedDateKey];
     }
-    await saveAllData();
+    await syncAndSave();
   }
 
   function updateRemarksUI() {
