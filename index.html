@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📅 共同要睇嘅calender! (即時同步版)</title>
+  <title>📅 共同要睇嘅calender! (雲端同步版)</title>
   <style>
     :root {
       --primary-color: #6A1B9A;
@@ -266,7 +266,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 實時同步中 (LocalStorage)</div>
+    <div class="sync-status" id="syncStatus">🟢 雲端即時同步中</div>
   </div>
 
   <div class="controls">
@@ -340,36 +340,74 @@
     { name: "jimmy",  color: "#6A1B9A", textColor: "#FFFFFF" }
   ];
 
+  const API_URL = "https://api.npoint.io/5fe1538bb620a9ce2aa3";
+
   let currentDate = new Date(2026, 7, 1);
   let selectedDateKey = null;
-  let storeData = loadData();
+  let storeData = { busy: {}, remarks: {} };
 
-  function loadData() {
-    return JSON.parse(localStorage.getItem('our_shared_calender_data')) || { busy: {}, remarks: {} };
+  // 從雲端讀取最新數據
+  async function fetchCloudData(isSilent = false) {
+    try {
+      const response = await fetch(API_URL + "?t=" + new Date().getTime());
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.busy) {
+          storeData = data;
+          renderCalendar();
+          updateRemarksUI();
+          if (!isSilent) {
+            showSyncStatus("⚡ 已成功同步最新雲端資料！", "#27ae60");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("同步失敗", error);
+      if (!isSilent) {
+        showSyncStatus("⚠️ 雲端同步失敗，請檢查網絡", "#e74c3c");
+      }
+    }
   }
 
-  // 聆聽其他視窗或分頁嘅即時數據更新事件
-  window.addEventListener('storage', (event) => {
-    if (event.key === 'our_shared_calender_data') {
-      storeData = loadData();
-      renderCalendar();
-      updateRemarksUI();
-      showSyncEffect();
+  // 儲存數據上雲端
+  async function saveCloudData() {
+    showSyncStatus("🔄 正在儲存至雲端...", "#e67e22");
+    try {
+      const response = await fetch(API_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(storeData)
+      });
+      if (response.ok) {
+        showSyncStatus("🟢 雲端同步成功", "#27ae60");
+        renderCalendar();
+        updateRemarksUI();
+      } else {
+        showSyncStatus("❌ 儲存失敗", "#e74c3c");
+      }
+    } catch (error) {
+      console.error("儲存失敗", error);
+      showSyncStatus("❌ 網絡異常，儲存失敗", "#e74c3c");
     }
-  });
+  }
 
-  function showSyncEffect() {
+  function showSyncStatus(text, color) {
     const statusEl = document.getElementById('syncStatus');
-    statusEl.innerText = "⚡ 偵測到對方有更新，已即時同步！";
-    setTimeout(() => {
-      statusEl.innerText = "🟢 實時同步中 (LocalStorage)";
-    }, 3000);
+    statusEl.innerText = text;
+    statusEl.style.color = color;
   }
 
   function init() {
     renderUserSelect();
     handleUserChange();
-    renderCalendar();
+    fetchCloudData();
+
+    // 每隔 5 秒自動向雲端檢查一次有沒有對方的新更新
+    setInterval(() => {
+      fetchCloudData(true);
+    }, 5000);
   }
 
   function renderUserSelect() {
@@ -409,12 +447,12 @@
     renderCalendar();
   }
 
-  function toggleStatus(dateStr) {
+  async function toggleStatus(dateStr) {
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
     
-    // 每次改動前重新讀取最新資料，避免覆蓋對方同時做嘅修改
-    storeData = loadData();
+    // 先抓取最新雲端數據避免覆蓋
+    await fetchCloudData(true);
 
     if (!storeData.busy[dateStr]) {
       storeData.busy[dateStr] = {};
@@ -437,25 +475,24 @@
       delete storeData.busy[dateStr][currentUser];
     }
 
-    saveData();
-    renderCalendar();
+    await saveCloudData();
     updateRemarksUI();
   }
 
-  function saveRemark() {
+  async function saveRemark() {
     if (!selectedDateKey) return;
     const input = document.getElementById('remarkInput');
     const text = input.value.trim();
     
-    storeData = loadData();
+    await fetchCloudData(true);
+
     if (text) {
       storeData.remarks[selectedDateKey] = text;
     } else {
       delete storeData.remarks[selectedDateKey];
     }
 
-    saveData();
-    renderCalendar();
+    await saveCloudData();
     updateRemarksUI();
   }
 
@@ -484,10 +521,6 @@
     } else {
       display.style.display = 'none';
     }
-  }
-
-  function saveData() {
-    localStorage.setItem('our_shared_calender_data', JSON.stringify(storeData));
   }
 
   function renderCalendar() {
@@ -527,10 +560,10 @@
 
       const dayNum = document.createElement('div');
       dayNum.className = 'day-number';
-      dayNum.innerHTML = `${day} ${storeData.remarks[dateKey] ? '<span class="has-remark-dot"></span>' : ''}`;
+      dayNum.innerHTML = `${day} ${storeData.remarks && storeData.remarks[dateKey] ? '<span class="has-remark-dot"></span>' : ''}`;
       cell.appendChild(dayNum);
 
-      if (storeData.busy[dateKey]) {
+      if (storeData.busy && storeData.busy[dateKey]) {
         Object.keys(storeData.busy[dateKey]).forEach(userName => {
           const userObj = storeData.busy[dateKey][userName];
           const memberInfo = members.find(m => m.name === userName);
