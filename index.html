@@ -37,11 +37,11 @@
 
     .header {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .header h1 {
-      margin: 0 0 8px 0;
+      margin: 0 0 6px 0;
       font-size: 22px;
       color: #880E4F;
     }
@@ -208,18 +208,18 @@
     }
 
     .remarks-section {
-      margin-top: 20px;
+      margin-top: 16px;
       background: #FFF0F3;
       border: 1px solid #F8BBD0;
       border-radius: 12px;
-      padding: 14px;
+      padding: 12px;
     }
 
     .remarks-header {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
       color: #880E4F;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .remarks-input-group {
@@ -229,10 +229,10 @@
 
     .remarks-input {
       flex: 1;
-      padding: 8px 12px;
+      padding: 6px 10px;
       border: 1px solid #F48FB1;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       outline: none;
     }
 
@@ -240,21 +240,61 @@
       background: #D81B60;
       color: white;
       border: none;
-      padding: 8px 14px;
+      padding: 6px 12px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
     }
 
     .remarks-display {
-      margin-top: 10px;
-      font-size: 13px;
+      margin-top: 8px;
+      font-size: 12px;
       color: #C2185B;
       background: #FCE4EC;
-      padding: 8px 12px;
+      padding: 6px 10px;
       border-radius: 6px;
       word-break: break-word;
+    }
+
+    /* 雲端編輯痕跡/JSON 監視器樣式 */
+    .debug-section {
+      margin-top: 16px;
+      background: #2D2D2D;
+      color: #00FF66;
+      border-radius: 12px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      color: #FFF;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .debug-pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .force-sync-btn {
+      background: #D81B60;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -263,7 +303,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 強制同步就緒</div>
+    <div class="sync-status" id="syncStatus">🟢 雲端同步就緒</div>
   </div>
 
   <div class="controls">
@@ -327,6 +367,15 @@
     </div>
     <div class="remarks-display" id="remarksDisplay" style="display: none;"></div>
   </div>
+
+  <!-- 🔍 編輯痕跡 / 原始雲端數據監視器 -->
+  <div class="debug-section">
+    <div class="debug-header">
+      <span>🔍 雲端原始數據 (編輯記錄監視器)</span>
+      <button class="force-sync-btn" onclick="fetchCloudData()">強制重新整理</button>
+    </div>
+    <pre class="debug-pre" id="debugJsonView">正在連線至雲端...</pre>
+  </div>
 </div>
 
 <script>
@@ -342,83 +391,86 @@
   let storeData = { busy: {}, remarks: {} };
 
   function loadLocal() {
-    const local = localStorage.getItem('cal_anticache_data');
+    const local = localStorage.getItem('cal_debug_data');
     if (local) {
       try { storeData = JSON.parse(local); } catch(e) {}
     }
   }
 
   function saveLocal() {
-    localStorage.getItem('cal_anticache_data');
-    localStorage.setItem('cal_anticache_data', JSON.stringify(storeData));
+    localStorage.setItem('cal_debug_data', JSON.stringify(storeData));
   }
 
-  // 深度合拼：將雲端同本地所有資料完美二合一
+  // 更新下方監視器畫面，讓你可以即時見到所有編輯痕跡
+  function updateDebugView() {
+    const view = document.getElementById('debugJsonView');
+    view.innerText = JSON.stringify(storeData, null, 2);
+  }
+
+  // 深度合拼資料
   function mergeData(cloudData) {
     if (!cloudData) return;
-    
-    let hasChanges = false;
+    let changed = false;
 
-    // 合拼 busy
     if (cloudData.busy) {
       if (!storeData.busy) storeData.busy = {};
       for (let date in cloudData.busy) {
         if (!storeData.busy[date]) storeData.busy[date] = {};
         for (let user in cloudData.busy[date]) {
-          const cloudVal = JSON.stringify(cloudData.busy[date][user]);
-          const localVal = JSON.stringify(storeData.busy[date][user]);
-          if (cloudVal !== localVal) {
+          if (JSON.stringify(storeData.busy[date][user]) !== JSON.stringify(cloudData.busy[date][user])) {
             storeData.busy[date][user] = cloudData.busy[date][user];
-            hasChanges = true;
+            changed = true;
           }
         }
       }
     }
 
-    // 合拼 remarks
     if (cloudData.remarks) {
       if (!storeData.remarks) storeData.remarks = {};
       for (let date in cloudData.remarks) {
         if (cloudData.remarks[date] && cloudData.remarks[date] !== storeData.remarks[date]) {
           storeData.remarks[date] = cloudData.remarks[date];
-          hasChanges = true;
+          changed = true;
         }
       }
     }
 
     saveLocal();
-    if (hasChanges) {
+    if (changed) {
       renderCalendar();
       updateRemarksUI();
     }
+    updateDebugView();
   }
 
-  // 強制聯絡雲端（加上 ?nocache=亂碼 防止快取）
+  // 從雲端同步
   async function fetchCloudData(isBackground = false) {
     try {
       const antiCacheUrl = `${API_URL}?nocache=${Date.now()}_${Math.random()}`;
       const res = await fetch(antiCacheUrl, { cache: 'no-store' });
       if (res.ok) {
         const cloudData = await res.json();
-        if (cloudData && (cloudData.busy || cloudData.remarks)) {
+        if (cloudData) {
           mergeData(cloudData);
         }
       }
-      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 即時同步正常";
+      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 同步成功";
     } catch (e) {
       if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 離線保護模式";
     }
+    updateDebugView();
   }
 
-  // 儲存並強制上載到雲端
+  // 儲存並強制上傳
   async function syncAndSave() {
     saveLocal();
     renderCalendar();
     updateRemarksUI();
+    updateDebugView();
 
-    document.getElementById('syncStatus').innerText = "🔄 正在同步更新...";
+    document.getElementById('syncStatus').innerText = "🔄 同步更新中...";
     try {
-      // 1. 寫入前先強制拉一次最新雲端資料合拼，確保唔會蓋過對方
+      // 1. 先拉雲端合併，避免覆蓋對方
       const antiCacheUrl = `${API_URL}?nocache=${Date.now()}_${Math.random()}`;
       const getRes = await fetch(antiCacheUrl, { cache: 'no-store' });
       if (getRes.ok) {
@@ -426,7 +478,7 @@
         mergeData(cloudData);
       }
 
-      // 2. 將合拼後的最新完整資料 PUT 上雲端
+      // 2. 寫入雲端
       const putRes = await fetch(API_URL, {
         method: 'PUT',
         headers: { 
@@ -439,11 +491,12 @@
       if (putRes.ok) {
         document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
       } else {
-        document.getElementById('syncStatus').innerText = "🟢 已儲存 (雲端忙碌中)";
+        document.getElementById('syncStatus').innerText = "🟢 已儲存 (雲端忙碌)";
       }
     } catch (e) {
       document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地模式)";
     }
+    updateDebugView();
   }
 
   function init() {
@@ -458,9 +511,10 @@
 
     loadLocal();
     renderCalendar();
+    updateDebugView();
     fetchCloudData();
 
-    // 每 3 秒自動在背景強制無快取抓取一次資料
+    // 每 3 秒自動後台同步
     setInterval(() => {
       fetchCloudData(true);
     }, 3000);
