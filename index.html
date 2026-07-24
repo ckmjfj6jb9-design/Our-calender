@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📅 共同要睇嘅calender!</title>
+  <title>📅 共同要睇嘅calender! (即時同步版)</title>
   <style>
     :root {
       --primary-color: #6A1B9A;
-      --bg-color: #FFF5F5; /* 已經改咗做淺粉紅色 */
+      --bg-color: #FFF5F5;
       --card-bg: #FFFFFF;
       --border-color: #F8BBD0;
     }
@@ -44,6 +44,13 @@
       margin: 0 0 8px 0;
       font-size: 22px;
       color: #880E4F;
+    }
+
+    .sync-status {
+      font-size: 11px;
+      color: #27ae60;
+      font-weight: bold;
+      margin-top: 4px;
     }
 
     .controls {
@@ -259,6 +266,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
+    <div class="sync-status" id="syncStatus">🟢 實時同步中 (LocalStorage)</div>
   </div>
 
   <div class="controls">
@@ -334,7 +342,29 @@
 
   let currentDate = new Date(2026, 7, 1);
   let selectedDateKey = null;
-  let storeData = JSON.parse(localStorage.getItem('our_shared_calender_data')) || { busy: {}, remarks: {} };
+  let storeData = loadData();
+
+  function loadData() {
+    return JSON.parse(localStorage.getItem('our_shared_calender_data')) || { busy: {}, remarks: {} };
+  }
+
+  // 聆聽其他視窗或分頁嘅即時數據更新事件
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'our_shared_calender_data') {
+      storeData = loadData();
+      renderCalendar();
+      updateRemarksUI();
+      showSyncEffect();
+    }
+  });
+
+  function showSyncEffect() {
+    const statusEl = document.getElementById('syncStatus');
+    statusEl.innerText = "⚡ 偵測到對方有更新，已即時同步！";
+    setTimeout(() => {
+      statusEl.innerText = "🟢 實時同步中 (LocalStorage)";
+    }, 3000);
+  }
 
   function init() {
     renderUserSelect();
@@ -383,6 +413,9 @@
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
     
+    // 每次改動前重新讀取最新資料，避免覆蓋對方同時做嘅修改
+    storeData = loadData();
+
     if (!storeData.busy[dateStr]) {
       storeData.busy[dateStr] = {};
     }
@@ -414,6 +447,7 @@
     const input = document.getElementById('remarkInput');
     const text = input.value.trim();
     
+    storeData = loadData();
     if (text) {
       storeData.remarks[selectedDateKey] = text;
     } else {
@@ -513,14 +547,15 @@
           }
         });
       }
-      cell.onclick = () => toggleStatus(dateKey);
+      cell.onclick = () => {
+        selectedDateKey = dateKey;
+        toggleStatus(dateKey);
+      };
       grid.appendChild(cell);
     }
   }
+
   init();
 </script>
 </body>
 </html>
-
-</details>
-
