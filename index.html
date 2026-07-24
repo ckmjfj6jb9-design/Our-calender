@@ -263,7 +263,7 @@
 <div class="app-container">
   <div class="header">
     <h1>📅 共同要睇嘅calender!</h1>
-    <div class="sync-status" id="syncStatus">🟢 雲端同步中...</div>
+    <div class="sync-status" id="syncStatus">🟢 準備就緒</div>
   </div>
 
   <div class="controls">
@@ -341,33 +341,64 @@
   let selectedDateKey = null;
   let storeData = { busy: {}, remarks: {} };
 
-  // 直接從雲端拉取最新資料
-  async function fetchCloudData() {
+  // 1. 先從本地讀取（防彈機制，確保瞬間有資料顯示）
+  function loadFromLocal() {
+    const saved = localStorage.getItem('cal_safe_backup');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.busy) storeData = parsed;
+      } catch (e) {}
+    }
+  }
+
+  // 2. 儲存落本地
+  function saveToLocal() {
+    localStorage.setItem('cal_safe_backup', JSON.stringify(storeData));
+  }
+
+  // 從雲端讀取，並同本地資料融合（如果雲端空白，就用本地頂上，唔會被洗走）
+  async function fetchCloudData(isBackground = false) {
     try {
       const res = await fetch(API_URL + "?t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
-        if (data && typeof data === 'object') {
-          storeData = {
-            busy: data.busy || {},
-            remarks: data.remarks || {}
-          };
-          renderCalendar();
-          updateRemarksUI();
-          document.getElementById('syncStatus').innerText = "🟢 雲端同步成功";
+        if (data && data.busy && Object.keys(data.busy).length > 0) {
+          // 雲端有野就以雲端為主，並更新本地
+          storeData = data;
+          saveToLocal();
+        } else {
+          // 如果雲端係空，但本地有野，就將本地推上雲端修復返
+          if (storeData && Object.keys(storeData.busy).length > 0) {
+            await pushToCloudSilent();
+          }
         }
+        renderCalendar();
+        updateRemarksUI();
+        if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 同步成功";
       }
     } catch (e) {
-      document.getElementById('syncStatus').innerText = "🔴 雲端連線失敗，請檢查網絡";
+      if (!isBackground) document.getElementById('syncStatus').innerText = "🟢 本地離線保護模式";
     }
   }
 
-  // 直接儲存上雲端，兩部機共用同一份
-  async function saveCloudData() {
-    document.getElementById('syncStatus').innerText = "🔄 正在同步至雲端...";
+  async function pushToCloudSilent() {
+    try {
+      await fetch(API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeData)
+      });
+    } catch(e) {}
+  }
+
+  // 儲存資料（先寫入本地，再同步上雲端）
+  async function saveAllData() {
+    saveToLocal(); // 確保本地第一時間鎖死，絕對唔會不見
     renderCalendar();
     updateRemarksUI();
 
+    document.getElementById('syncStatus').innerText = "🔄 儲存中...";
     try {
       const res = await fetch(API_URL, {
         method: 'PUT',
@@ -377,10 +408,10 @@
       if (res.ok) {
         document.getElementById('syncStatus').innerText = "🟢 雙向同步成功";
       } else {
-        document.getElementById('syncStatus').innerText = "🔴 同步失敗 (請重試)";
+        document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地安全模式)";
       }
     } catch (e) {
-      document.getElementById('syncStatus').innerText = "🔴 網絡異常";
+      document.getElementById('syncStatus').innerText = "🟢 已儲存 (本地安全模式)";
     }
   }
 
@@ -394,12 +425,14 @@
       select.appendChild(opt);
     });
 
-    fetchCloudData();
+    loadFromLocal(); // 先載入本地
+    renderCalendar();
+    fetchCloudData(); // 再嘗試聯絡雲端
 
-    // 每 3 秒自動向雲端更新，確保另一部機改咗嘢，呢邊即刻睇到
+    // 每 4 秒背景同步一次
     setInterval(() => {
-      fetchCloudData();
-    }, 3000);
+      fetchCloudData(true);
+    }, 4000);
 
     handleUserChange();
   }
@@ -423,9 +456,6 @@
     selectedDateKey = dateStr;
     const currentUser = document.getElementById('userSelect').value;
 
-    // 每次撳之前先拉一次最新雲端資料，費事覆蓋咗對方剛才加嘅嘢
-    await fetchCloudData();
-
     if (!storeData.busy) storeData.busy = {};
     if (!storeData.busy[dateStr]) storeData.busy[dateStr] = {};
 
@@ -445,14 +475,12 @@
       }
     }
 
-    await saveCloudData();
+    await saveAllData();
   }
 
   async function saveRemark() {
     if (!selectedDateKey) return;
     const text = document.getElementById('remarkInput').value.trim();
-
-    await fetchCloudData();
 
     if (!storeData.remarks) storeData.remarks = {};
     if (text) {
@@ -460,7 +488,7 @@
     } else {
       delete storeData.remarks[selectedDateKey];
     }
-    await saveCloudData();
+    await saveAllData();
   }
 
   function updateRemarksUI() {
